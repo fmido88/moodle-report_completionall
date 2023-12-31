@@ -264,11 +264,11 @@ if (!$csv) {
 
     echo $OUTPUT->single_select($url, 'enrolstat', [
         'all' => get_string('all'),
-        'active' => 'Active only',
-        'suspended' => 'suspended only',
-        'notcurrent' => 'not current only',
-        'notsuspended' => 'Active and not current',
-        'notactive' => 'Not active',
+        'active' => get_string('filter_acitve', 'report_completionall'),
+        'suspended' => get_string('filter_suspended', 'report_completionall'),
+        'notcurrent' => get_string('filter_notcurrent', 'report_completionall'),
+        'notsuspended' => get_string('filter_notsuspended', 'report_completionall'),
+        'notactive' => get_string('filter_notactive', 'report_completionall'),
     ], $enrolstat, []);
 
     if (!$total) {

@@ -41,3 +41,8 @@ $string['enrol_status'] = 'Enrolment Status';
 $string['enrol_active'] = '<p style="color:green;">Active</p>';
 $string['enrol_notcurrent'] = '<p style="color:gray;">Not current</p>';
 $string['enrol_suspended'] = '<p style="color:orange;">Suspended</p>';
+$string['filter_notactive'] = 'Not active';
+$string['filter_notsuspended'] = 'Not suspended';
+$string['filter_notcurrent'] = 'Not current only';
+$string['filter_suspended'] = 'Suspended only';
+$string['filter_active'] = 'Active only';

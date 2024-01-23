@@ -22,7 +22,7 @@
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 
-namespace report_completion\privacy;
+namespace report_completionall\privacy;
 
 /**
  * Privacy provider implementation for report_completionall.

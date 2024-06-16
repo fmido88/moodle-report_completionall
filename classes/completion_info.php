@@ -45,6 +45,32 @@ class completion_info extends \completion_info {
     public $course;
     /** @var array */
     public $criteria;
+    /** @var string */
+    public $enrolstat;
+    /**
+     * All user
+     */
+    public const STAT_ALL = 'all';
+    /**
+     * Only active users
+     */
+    public const STAT_ONLY_ACTIVE = 'active';
+    /**
+     * Only suspended users.
+     */
+    public const STAT_ONLY_SUSPENDED = 'suspended';
+    /**
+     * Not suspended but may be not active.
+     */
+    public const STAT_NOT_SUSPENDED = 'notsuspended';
+    /**
+     * Not active (suspended or not current).
+     */
+    public const STAT_NOT_ACTIVE = 'notactive';
+    /**
+     * Not current but may be suspended too.
+     */
+    public const STAT_NOT_CURRENT = 'notcurrent';
     /**
      * Constructs with course details.
      *
@@ -54,10 +80,12 @@ class completion_info extends \completion_info {
      * it is used for cache validation.
      *
      * @param \stdClass $course Moodle course object.
+     * @param string $enrolstat
      */
-    public function __construct($course) {
+    public function __construct($course, $enrolstat = 'all') {
         $this->course = $course;
         $this->course_id = $course->id;
+        $this->enrolstat = $enrolstat;
     }
 
     /**
@@ -102,7 +130,224 @@ class completion_info extends \completion_info {
         return is_enrolled(\context_course::instance($this->course->id), $userid,
                                     'moodle/course:isincompletionreports', $onlyactive);
     }
+    /**
+     * Returns array with sql joins and parameters returning all ids
+     * of users enrolled into course.
+     *
+     * This function is using 'ej[0-9]+_' prefix for table names and parameters.
+     *
+     * @throws coding_exception
+     *
+     * @param \context $context
+     * @param string $useridcolumn User id column used the calling query, e.g. u.id
+     * @param int $enrolid The enrolment ID. If not 0, only users enrolled using this enrolment method will be returned.
+     * @return \core\dml\sql_join Contains joins, wheres, params
+     */
+    protected function get_enrolled_join(\context $context, $useridcolumn, $enrolid = 0) {
+        // Use unique prefix just in case somebody makes some SQL magic with the result.
+        static $i = 0;
+        $i++;
+        $prefix = 'ej' . $i . '_';
 
+        $all = $this->enrolstat == self::STAT_ALL;
+        $onlyactive = $this->enrolstat == self::STAT_ONLY_ACTIVE;
+        $onlysuspended = $this->enrolstat == self::STAT_ONLY_SUSPENDED;
+        $notactive = $this->enrolstat == self::STAT_NOT_ACTIVE;
+        $notsuspended = $this->enrolstat == self::STAT_NOT_SUSPENDED;
+        $notcurrent = $this->enrolstat == self::STAT_NOT_CURRENT;
+
+        // Cases to check the enrol status.
+        $checkstat = $onlyactive || $onlysuspended || $notsuspended || $notactive;
+        // ENROL_STAT_ACTIVE.
+        $statactive = ($onlyactive && !$onlysuspended) || $notsuspended;
+        // Cases to check the enrol periods.
+        $checkcurrent = $onlyactive || $notactive || $notcurrent;
+        // Enrolment time is active.
+        $current = $onlyactive || (!$notactive && !$notcurrent);
+
+        // First find the course context.
+        $coursecontext = $context->get_course_context();
+
+        $isfrontpage = ($coursecontext->instanceid == SITEID);
+
+        $joins  = [];
+        $wheres = [];
+        $params = [];
+
+        $wheres[] = "1 = 1"; // Prevent broken where clauses later on.
+
+        // Note all users are "enrolled" on the frontpage, but for others...
+        if (!$isfrontpage) {
+            if ($checkstat) {
+                $where1 = "{$prefix}ue.status = :{$prefix}active AND {$prefix}e.status = :{$prefix}enabled";
+            } else {
+                $where1 = "1 = 1";
+            }
+
+            if ($checkcurrent) {
+                $where2 = "{$prefix}ue.timestart < :{$prefix}now1";
+                $where2 .= " AND ({$prefix}ue.timeend = 0 OR {$prefix}ue.timeend > :{$prefix}now2)";
+            } else {
+                $where2 = "1 = 1";
+            }
+
+            $enrolconditions = [
+                "{$prefix}e.id = {$prefix}ue.enrolid",
+                "{$prefix}e.courseid = :{$prefix}courseid",
+            ];
+            if ($enrolid) {
+                $enrolconditions[] = "{$prefix}e.id = :{$prefix}enrolid";
+                $params[$prefix . 'enrolid'] = $enrolid;
+            }
+            $enrolconditionssql = implode(" AND ", $enrolconditions);
+            $ejoin = "JOIN {enrol} {$prefix}e ON ($enrolconditionssql)";
+
+            $params[$prefix.'courseid'] = $coursecontext->instanceid;
+
+            if (($statactive && $current) || $all) {
+                $joins[] = "JOIN {user_enrolments} {$prefix}ue ON {$prefix}ue.userid = $useridcolumn";
+                $joins[] = $ejoin;
+                $wheres[] = "$where1 AND $where2";
+
+            } else {
+                // Users either suspended or not active.
+                // Consider multiple enrols where one is not suspended or plain role_assign.
+                if ($checkstat && $statactive) {
+                    $checkstat = false;
+                    $where1 = '1=1';
+                }
+                if ($checkcurrent && $current) {
+                    $checkcurrent = false;
+                    $where2 = '1=1';
+                }
+                $enrolselect = "SELECT DISTINCT {$prefix}ue.userid
+                                FROM {user_enrolments} {$prefix}ue $ejoin
+                                WHERE $where1 AND $where2";
+                $joins[] = "JOIN {user_enrolments} {$prefix}ue1 ON {$prefix}ue1.userid = $useridcolumn";
+                $enrolconditions = [
+                    "{$prefix}e1.id = {$prefix}ue1.enrolid",
+                    "{$prefix}e1.courseid = :{$prefix}_e1_courseid",
+                ];
+                if ($enrolid) {
+                    $enrolconditions[] = "{$prefix}e1.id = :{$prefix}e1_enrolid";
+                    $params[$prefix . 'e1_enrolid'] = $enrolid;
+                }
+                $enrolconditionssql = implode(" AND ", $enrolconditions);
+                $joins[] = "JOIN {enrol} {$prefix}e1 ON ($enrolconditionssql)";
+                $params["{$prefix}_e1_courseid"] = $coursecontext->instanceid;
+                $wheres[] = "$useridcolumn NOT IN ($enrolselect)";
+            }
+
+            $now = round(time(), -2); // Rounding helps caching in DB.
+            $chekingparams = [];
+            if ($checkstat) {
+                $chekingparams[$prefix . 'enabled'] = ENROL_INSTANCE_ENABLED;
+                $chekingparams[$prefix . 'active'] = ENROL_USER_ACTIVE;
+            }
+            if ($checkcurrent) {
+                $chekingparams[$prefix . 'now1'] = $now;
+                $chekingparams[$prefix . 'now2'] = $now;
+            }
+            $params = array_merge($params, $chekingparams);
+
+        }
+
+        $joins = implode("\n", $joins);
+        $wheres = implode(" AND ", $wheres);
+
+        return new \core\dml\sql_join($joins, $wheres, $params);
+    }
+    /**
+     * Returns an array of joins, wheres and params that will limit the group of
+     * users to only those enrolled and with given capability (if specified).
+     *
+     * Note this join will return duplicate rows for users who have been enrolled
+     * several times (e.g. as manual enrolment, and as self enrolment). You may
+     * need to use a SELECT DISTINCT in your query (see get_enrolled_sql for example).
+     *
+     * In case is guaranteed some of the joins never match any rows, the resulting
+     * join_sql->cannotmatchanyrows will be true. This happens when the capability
+     * is prohibited.
+     *
+     * @param \context $context
+     * @param string $prefix optional, a prefix to the user id column
+     * @param string|array $capability optional, may include a capability name, or array of names.
+     *      If an array is provided then this is the equivalent of a logical 'OR',
+     *      i.e. the user needs to have one of these capabilities.
+     * @param int $group optional, 0 indicates no current group.
+     * @param int $enrolid The enrolment ID. If not 0, only users enrolled using this enrolment method will be returned.
+     * @return \core\dml\sql_join Contains joins, wheres, params and cannotmatchanyrows
+     */
+    protected function get_enrolled_with_capabilities_join(\context $context,
+                                                            $prefix = '',
+                                                            $capability = '',
+                                                            $group = 0,
+                                                            $enrolid = 0) {
+        $uid = $prefix . 'u.id';
+        $joins = [];
+        $wheres = [];
+        $cannotmatchanyrows = false;
+
+        $enrolledjoin = $this->get_enrolled_join($context, $uid, $enrolid);
+        $joins[] = $enrolledjoin->joins;
+        $wheres[] = $enrolledjoin->wheres;
+        $params = $enrolledjoin->params;
+        $cannotmatchanyrows = $cannotmatchanyrows || $enrolledjoin->cannotmatchanyrows;
+
+        if (!empty($capability)) {
+            $capjoin = get_with_capability_join($context, $capability, $uid);
+            $joins[] = $capjoin->joins;
+            $wheres[] = $capjoin->wheres;
+            $params = array_merge($params, $capjoin->params);
+            $cannotmatchanyrows = $cannotmatchanyrows || $capjoin->cannotmatchanyrows;
+        }
+
+        if ($group) {
+            $groupjoin = groups_get_members_join($group, $uid, $context);
+            $joins[] = $groupjoin->joins;
+            $params = array_merge($params, $groupjoin->params);
+            if (!empty($groupjoin->wheres)) {
+                $wheres[] = $groupjoin->wheres;
+            }
+            $cannotmatchanyrows = $cannotmatchanyrows || $groupjoin->cannotmatchanyrows;
+        }
+
+        $joins = implode("\n", $joins);
+        $wheres[] = "{$prefix}u.deleted = 0";
+        $wheres = implode(" AND ", $wheres);
+
+        return new \core\dml\sql_join($joins, $wheres, $params, $cannotmatchanyrows);
+    }
+    /**
+     * Returns array with sql code and parameters returning all ids
+     * of users enrolled into course.
+     *
+     * This function is using 'eu[0-9]+_' prefix for table names and parameters.
+     *
+     * @param \context $context
+     * @param string $withcapability
+     * @param int $groupid 0 means ignore groups
+     * @param int $enrolid The enrolment ID. If not 0, only users enrolled using this enrolment method will be returned.
+     * @return array list($sql, $params)
+     */
+    protected function get_enrolled_sql(\context $context, $withcapability = '', $groupid = 0,
+                            $enrolid = 0) {
+
+        // Use unique prefix just in case somebody makes some SQL magic with the result.
+        static $i = 0;
+        $i++;
+        $prefix = 'eu' . $i . '_';
+
+        $capjoin = $this->get_enrolled_with_capabilities_join(
+                $context, $prefix, $withcapability, $groupid, $enrolid);
+
+        $sql = "SELECT DISTINCT {$prefix}u.id
+                FROM {user} {$prefix}u
+                $capjoin->joins
+                WHERE $capjoin->wheres";
+
+        return [$sql, $capjoin->params];
+    }
     /**
      * Returns the number of users whose progress is tracked in this course.
      *
@@ -115,40 +360,19 @@ class completion_info extends \completion_info {
      */
     public function get_num_tracked_users($where = '', $whereparams = [], $groupid = 0) {
         global $DB;
-        switch(get_user_preferences('report_completion_all_enrolstat', 'all')) {
-            case 'all':
-                $onlyactive = false;
-                $onlysuspended = false;
-                break;
-            case 'suspended':
-            case 'notcurrent':
-            case 'notactive':
-                $onlyactive = false;
-                $onlysuspended = true;
-                break;
-            case 'notsuspended':
-                $onlyactive = false;
-                $onlysuspended = false;
-                break;
-            case 'active':
-                $onlyactive = true;
-                $onlysuspended = false;
-                break;
-            default:
-                $onlyactive = false;
-                $onlysuspended = false;
-        }
-        list($enrolledsql, $enrolledparams) = get_enrolled_sql(
+
+        list($enrolledsql, $enrolledparams) = $this->get_enrolled_sql(
                                                     \context_course::instance($this->course->id),
                                                     'moodle/course:isincompletionreports',
-                                                    $groupid, $onlyactive, $onlysuspended
-                                                );
+                                                    $groupid);
+
         $sql  = 'SELECT COUNT(eu.id) FROM (' . $enrolledsql . ') eu JOIN {user} u ON u.id = eu.id';
         if ($where) {
             $sql .= " WHERE $where";
         }
 
         $params = array_merge($enrolledparams, $whereparams);
+
         return $DB->count_records_sql($sql, $params);
     }
 
@@ -169,7 +393,7 @@ class completion_info extends \completion_info {
      */
     public function get_tracked_users($where = '', $whereparams = [], $groupid = 0,
              $sort = '', $limitfrom = '', $limitnum = '', \context $extracontext = null) {
-        switch(get_user_preferences('report_completion_all_enrolstat', 'all')) {
+        switch($this->enrolstat) {
             case 'all':
                 $includenotcurrent = true;
                 $includesuspended = true;
@@ -205,14 +429,13 @@ class completion_info extends \completion_info {
                 $includesuspended = true;
                 $includeactive = true;
         }
-        $onlyactive = $includeactive && !$includenotcurrent && !$includesuspended;
-        $onlysuspended = !$includeactive;
+
         global $DB;
 
         $context = \context_course::instance($this->course->id);
-        list($enrolledsql, $params) = get_enrolled_sql(
+        list($enrolledsql, $params) = $this->get_enrolled_sql(
                 $context,
-                'moodle/course:isincompletionreports', $groupid, $onlyactive, $onlysuspended);
+                'moodle/course:isincompletionreports', $groupid);
 
         $userfieldsapi = \core_user\fields::for_identity($extracontext)->with_name()->excluding('id', 'idnumber');
         $fieldssql = $userfieldsapi->get_sql('u', true);

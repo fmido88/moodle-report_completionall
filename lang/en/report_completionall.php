@@ -21,28 +21,28 @@
  * @copyright  2023 Mohammad Farouk
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
-
 $string['clicktomarkusercomplete'] = 'Click to mark user complete';
 $string['completionall:view'] = 'View course completion report including nonactive users';
 $string['completiondate'] = 'Completion date';
+$string['enrol_active'] = '<p style="color:green;">Active</p>';
+$string['enrol_notcurrent'] = '<p style="color:gray;">Not current</p>';
+$string['enrol_status'] = 'Enrolment Status';
+$string['enrol_suspended'] = '<p style="color:orange;">Suspended</p>';
+$string['eventreportviewed'] = 'Completion report  (all users) viewed';
+$string['eventuserreportviewed'] = 'Completion user report viewed';
+$string['filter_active'] = 'Active only';
+$string['filter_notactive'] = 'Not active';
+$string['filter_notcurrent'] = 'Not current only';
+$string['filter_notsuspended'] = 'Not suspended';
+$string['filter_suspended'] = 'Suspended only';
+$string['filter_user_state'] = 'Filter by enrolment status: ';
 $string['id'] = 'ID';
 $string['name'] = 'Name';
 $string['nocapability'] = 'Can not access user completion report';
-$string['page-report-completionall-x'] = 'Any completion report';
 $string['page-report-completionall-index'] = 'Course completion report';
-$string['page-report-completionall-user'] = 'User course completion report';
 $string['page-report-completionall-progress'] = 'Activity completion report';
+$string['page-report-completionall-user'] = 'User course completion report';
+$string['page-report-completionall-x'] = 'Any completion report';
 $string['pluginname'] = 'Course completion (all users)';
 $string['privacy:metadata'] = 'The Course completion  (all users) report only shows data stored in other locations.';
-$string['eventreportviewed'] = 'Completion report  (all users) viewed';
-$string['eventuserreportviewed'] = 'Completion user report viewed';
 $string['progress_report'] = 'Activity completion (all users)';
-$string['enrol_status'] = 'Enrolment Status';
-$string['enrol_active'] = '<p style="color:green;">Active</p>';
-$string['enrol_notcurrent'] = '<p style="color:gray;">Not current</p>';
-$string['enrol_suspended'] = '<p style="color:orange;">Suspended</p>';
-$string['filter_notactive'] = 'Not active';
-$string['filter_notsuspended'] = 'Not suspended';
-$string['filter_notcurrent'] = 'Not current only';
-$string['filter_suspended'] = 'Suspended only';
-$string['filter_active'] = 'Active only';

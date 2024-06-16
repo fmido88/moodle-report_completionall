@@ -41,8 +41,6 @@ $format    = optional_param('format', '', PARAM_ALPHA);
 $sort      = optional_param('sort', '', PARAM_ALPHA);
 $edituser  = optional_param('edituser', 0, PARAM_INT);
 $enrolstat = optional_param('enrolstat', 'all', PARAM_TEXT);
-set_user_preference('report_completion_all_enrolstat', $enrolstat);
-$enrolstat = get_user_preferences('report_completion_all_enrolstat', $enrolstat);
 
 $course = $DB->get_record('course', ['id' => $courseid], '*', MUST_EXIST);
 $context = context_course::instance($course->id);
@@ -87,7 +85,7 @@ if ($group === 0 && $course->groupmode == SEPARATEGROUPS) {
 $modinfo = get_fast_modinfo($course);
 
 // Get criteria for course.
-$completion = new report_completionall\completion_info($course);
+$completion = new report_completionall\completion_info($course, $enrolstat);
 
 
 if (!$completion->has_criteria()) {
@@ -160,11 +158,12 @@ if ($csv) {
     report_helper::print_report_selector($pluginname);
 
     // Handle groups (if enabled).
-    groups_print_course_menu($course, $CFG->wwwroot.'/report/completion/index.php?course='.$course->id);
+    groups_print_course_menu($course, $CFG->wwwroot.'/report/completionall/index.php?course='.$course->id);
 
+    echo get_string('filter_user_state', 'report_completionall');
     echo $OUTPUT->single_select($url, 'enrolstat', [
         'all' => get_string('all'),
-        'active' => get_string('filter_acitve', 'report_completionall'),
+        'active' => get_string('filter_active', 'report_completionall'),
         'suspended' => get_string('filter_suspended', 'report_completionall'),
         'notcurrent' => get_string('filter_notcurrent', 'report_completionall'),
         'notsuspended' => get_string('filter_notsuspended', 'report_completionall'),
@@ -231,11 +230,11 @@ if ($total) {
         $csv ? 0 : $start,
         $context
     );
-    $total = count($progress);
 }
 
 // Build link for paging.
-$link = $CFG->wwwroot.'/report/completion/index.php?course='.$course->id;
+$link = $CFG->wwwroot.'/report/completionall/index.php?course='.$course->id;
+$link .= '&amp;enrolstat='.$enrolstat;
 if (strlen($sort)) {
     $link .= '&amp;sort='.$sort;
 }
@@ -751,8 +750,8 @@ if ($csv) {
 
 print '</table>';
 
-$csvurl = new moodle_url('/report/completion/index.php', ['course' => $course->id, 'format' => 'csv']);
-$excelurl = new moodle_url('/report/completion/index.php', ['course' => $course->id, 'format' => 'excelcsv']);
+$csvurl = new moodle_url('/report/completionall/index.php', ['course' => $course->id, 'format' => 'csv']);
+$excelurl = new moodle_url('/report/completionall/index.php', ['course' => $course->id, 'format' => 'excelcsv']);
 
 print '<ul class="export-actions">';
 print '<li><a href="'.$csvurl->out().'">'.get_string('csvdownload', 'completion').'</a></li>';

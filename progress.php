@@ -54,8 +54,6 @@ $groupid = optional_param('group', 0, PARAM_INT);
 $activityinclude = optional_param('activityinclude', 'all', PARAM_TEXT);
 $activityorder = optional_param('activityorder', 'orderincourse', PARAM_TEXT);
 $enrolstat = optional_param('enrolstat', 'all', PARAM_TEXT);
-set_user_preference('report_completion_all_enrolstat', $enrolstat);
-$enrolstat = get_user_preferences('report_completion_all_enrolstat', null);
 
 // Whether to show extra user identity information.
 $userfields = \core_user\fields::for_identity($context);
@@ -118,7 +116,7 @@ if ($group === 0 && $course->groupmode == SEPARATEGROUPS) {
 
 // Get data on activities and progress of all users, and give error if we've.
 // nothing to display (no users or no activities).
-$completion = new report_completionall\completion_info($course);
+$completion = new report_completionall\completion_info($course, $enrolstat);
 list($activitytypes, $activities) = helper::get_activities_to_show($completion, $activityinclude, $activityorder);
 $output = $PAGE->get_renderer('report_progress');
 
@@ -174,7 +172,6 @@ if ($total) {
         $csv ? 0 : $page * helper::COMPLETION_REPORT_PAGE,
         $context
     );
-    $total = count($progress);
 }
 
 if ($csv && $grandtotal && count($activities) > 0) { // Only show CSV if there are some users/actvs.
@@ -217,6 +214,17 @@ if ($csv && $grandtotal && count($activities) > 0) { // Only show CSV if there a
     // Display activity order options.
     echo $output->render_activity_order_select($url, $activityorder);
 
+    print '<br class="clearer"/>';
+
+    echo get_string('filter_user_state', 'report_completionall');
+    echo $OUTPUT->single_select($url, 'enrolstat', [
+        'all' => get_string('all'),
+        'active' => get_string('filter_active', 'report_completionall'),
+        'suspended' => get_string('filter_suspended', 'report_completionall'),
+        'notcurrent' => get_string('filter_notcurrent', 'report_completionall'),
+        'notsuspended' => get_string('filter_notsuspended', 'report_completionall'),
+        'notactive' => get_string('filter_notactive', 'report_completionall'),
+    ], $enrolstat, []);
 
 }
 
@@ -258,18 +266,11 @@ $pagingbar .= $OUTPUT->paging_bar($total, $page, helper::COMPLETION_REPORT_PAGE,
 
 // Start of table.
 if (!$csv) {
+
     print '<br class="clearer"/>';
 
-    print $pagingbar;
+    echo $pagingbar;
 
-    echo $OUTPUT->single_select($url, 'enrolstat', [
-        'all' => get_string('all'),
-        'active' => get_string('filter_acitve', 'report_completionall'),
-        'suspended' => get_string('filter_suspended', 'report_completionall'),
-        'notcurrent' => get_string('filter_notcurrent', 'report_completionall'),
-        'notsuspended' => get_string('filter_notsuspended', 'report_completionall'),
-        'notactive' => get_string('filter_notactive', 'report_completionall'),
-    ], $enrolstat, []);
 
     if (!$total) {
         echo $OUTPUT->heading(get_string('nothingtodisplay'));

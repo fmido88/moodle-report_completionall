@@ -18,14 +18,17 @@
  * Version details
  *
  * @copyright  2023 Mohammad Farouk
+ * @package    report_completionall
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 
 defined('MOODLE_INTERNAL') || die;
 
-$plugin->version   = 2022112800;
-$plugin->release   = '1.0.0';
+$plugin->version   = 2024061600;
+$plugin->release   = '1.0.2';
 $plugin->requires  = 2022111800;
 $plugin->maturity  = MATURITY_STABLE;
 $plugin->component = 'report_completionall';
-$plugin->dependencies  = ['report_progress' => ANY_VERSION];
+$plugin->dependencies  = [
+    'report_progress' => ANY_VERSION,
+];

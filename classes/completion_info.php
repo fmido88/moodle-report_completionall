@@ -462,7 +462,7 @@ class completion_info extends \completion_info {
             JOIN (SELECT DISTINCT userid, roleid
                                 FROM {role_assignments}
                                WHERE contextid = :contextid
-                             ) ra ON ra.userid = ue.userid AND ra.roleid = e.roleid
+                             ) ra ON ra.userid = ue.userid
             WHERE ue.userid = :userid";
             $params = ['courseid' => $this->course->id, 'contextid' => $context->id, 'userid' => $user->id];
             $user->enrolments = $DB->get_records_sql($sql, $params);

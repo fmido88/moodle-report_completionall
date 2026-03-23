@@ -502,7 +502,7 @@ class completion_info extends \completion_info {
      *
      * @param int $criteriatype Specific criteria type to return (optional)
      */
-    public function get_criteria($criteriatype = null) {
+    public function get_criteria(?int $criteriatype = null): array {
 
         // Fill cache if empty.
         if (!is_array($this->criteria)) {

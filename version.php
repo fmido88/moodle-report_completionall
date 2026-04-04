@@ -25,7 +25,7 @@
 defined('MOODLE_INTERNAL') || die;
 
 $plugin->version   = 2026040400;
-$plugin->release   = '1.0.3';
+$plugin->release   = '5.1.0';
 $plugin->requires  = 2025100600;
 $plugin->maturity  = MATURITY_STABLE;
 $plugin->component = 'report_completionall';
